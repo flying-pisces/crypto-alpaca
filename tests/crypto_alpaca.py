@@ -126,8 +126,7 @@ class CryptoAlpaca:
         """Handle WebSocket connection open"""
         print("🔗 Crypto WebSocket connected")
         self.is_connected = True
-        self.is_ready = True  # STEP 1: Bypass auth wait for testing
-        print("✅ Crypto authenticated via headers")
+        # Don't set is_ready here - wait for actual authentication
     
     def _on_message(self, ws, message):
         """Handle incoming WebSocket messages"""
@@ -152,6 +151,25 @@ class CryptoAlpaca:
             return
         
         msg_type = data['T']
+        
+        # Handle authentication and connection messages
+        if msg_type == "success":
+            if data.get("msg") == "connected":
+                print("✅ Connected to crypto stream")
+            elif data.get("msg") == "authenticated":
+                print("✅ Crypto authenticated via headers")
+                self.is_ready = True  # Now ready to subscribe
+        
+        elif msg_type == "subscription":
+            if data.get("msg") == "subscribed":
+                print(f"✅ Subscription confirmed")
+        
+        elif msg_type == "error":
+            error_msg = str(data.get("msg", ""))
+            if "already authenticated" not in error_msg.lower():
+                print(f"❌ API Error: {error_msg}")
+        
+        # Process actual market data only after this point
         
         # Trade data
         if msg_type == 't' and 'S' in data and 'p' in data:
@@ -259,16 +277,23 @@ class CryptoAlpaca:
         if streams is None:
             streams = self.default_streams
         
-        # Build subscription message
+        # Build subscription message using correct Alpaca crypto API format
         subscribe_msg = {
             "action": "subscribe"
         }
         
-        # Add stream subscriptions
+        # Add stream subscriptions - Alpaca crypto uses full names, not single letters
         for stream in streams:
-            if stream in self.stream_types:
-                key = self.stream_types[stream]
-                subscribe_msg[key] = symbols
+            if stream == "trades":
+                subscribe_msg["trades"] = symbols
+            elif stream == "quotes":
+                subscribe_msg["quotes"] = symbols
+            elif stream == "bars":
+                subscribe_msg["bars"] = symbols
+            elif stream == "daily_bars":
+                subscribe_msg["dailyBars"] = symbols
+            elif stream == "orderbook":
+                subscribe_msg["orderbooks"] = symbols
         
         # Send subscription
         try:
@@ -278,9 +303,6 @@ class CryptoAlpaca:
             # Display subscription info
             print(f"📡 Subscribed to {len(symbols)} crypto symbols: {', '.join(symbols)}")
             print(f"📊 Stream types: {', '.join(streams)}")
-            
-            # STEP 3: Add simulated data for testing
-            self._simulate_crypto_data(symbols)
             
             return True
             
@@ -316,39 +338,6 @@ class CryptoAlpaca:
         except:
             return False
     
-    def _simulate_crypto_data(self, symbols):
-        """STEP 3: Simulate crypto data reception for testing"""
-        import threading
-        import time
-        import random
-        import json
-        
-        def send_mock_data():
-            time.sleep(2)  # Wait 2 seconds before sending data
-            
-            for i in range(5):  # Send 5 mock data points
-                for symbol in symbols[:2]:  # Just first 2 symbols
-                    # Simulate a trade message
-                    mock_trade = {
-                        "T": "t",
-                        "S": symbol,
-                        "p": 45000 + random.randint(-1000, 1000) if "BTC" in symbol else 3200 + random.randint(-200, 200),
-                        "s": round(random.uniform(0.001, 0.1), 6),
-                        "tks": "B" if random.random() > 0.5 else "S",
-                        "t": datetime.now().isoformat() + "Z"
-                    }
-                    
-                    # STEP 4: Send mock data through WebSocket message handler
-                    mock_message = json.dumps([mock_trade])  # Alpaca sends as arrays
-                    self._on_message(self.ws, mock_message)
-                    
-                time.sleep(3)  # Space out the data
-        
-        # Start mock data thread
-        mock_thread = threading.Thread(target=send_mock_data)
-        mock_thread.daemon = True
-        mock_thread.start()
-
     def disconnect(self):
         """Disconnect from WebSocket"""
         if self.ws:
