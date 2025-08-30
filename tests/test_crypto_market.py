@@ -108,12 +108,12 @@ class CryptoMarketTester:
             self.display_system_return("Crypto authentication failed", False)
             return
         
-        # Test 5: Subscribe to Major Cryptos
-        self.display_prompt("Subscribing to major crypto pairs: BTC/USD, ETH/USD, SOL/USD")
+        # Test 5: Subscribe to Top Market Cap Cryptos
+        self.display_prompt("Subscribing to top 5 market cap crypto pairs: BTC/USD, ETH/USD, SOL/USD, BNB/USD, XRP/USD")
         
-        test_symbols = ["BTC/USD", "ETH/USD", "SOL/USD"]
+        test_symbols = ["BTC/USD", "ETH/USD", "SOL/USD", "BNB/USD", "XRP/USD"]
         if self.crypto.subscribe(test_symbols):
-            self.display_system_return("Successfully subscribed to 3 crypto pairs")
+            self.display_system_return(f"Successfully subscribed to {len(test_symbols)} crypto pairs")
             self.display_system_return("Subscribed to trades, quotes, and bars data streams")
             self.test_results['subscription'] = True
             self.test_results['test_symbols'] = test_symbols
@@ -157,12 +157,12 @@ class CryptoMarketTester:
         self.test_results['price_count'] = self.crypto.data_count
         self.price_data = self.crypto.price_data.copy()
         
-        # Test 7: Additional Symbols
-        self.display_prompt("Testing additional popular crypto symbols")
+        # Test 7: Additional Top 10 Symbols
+        self.display_prompt("Testing additional top 10 crypto symbols")
         
-        additional_symbols = ["AVAX/USD", "ADA/USD", "DOGE/USD"]
+        additional_symbols = ["DOGE/USD", "ADA/USD", "TRX/USD", "AVAX/USD", "TON/USD"]
         if self.crypto.subscribe(additional_symbols, streams=["quotes"]):
-            self.display_system_return("Successfully added 3 more crypto pairs")
+            self.display_system_return(f"Successfully added {len(additional_symbols)} more crypto pairs")
         
         # Brief wait for additional data
         time.sleep(5)
@@ -196,6 +196,9 @@ class CryptoMarketTester:
         
         # Display results
         self.display_test_results()
+        
+        # Interactive ticker check
+        self.interactive_ticker_check()
     
     def setup_crypto_data_capture(self):
         """Setup data capture for the crypto streamer"""
@@ -372,6 +375,104 @@ class CryptoMarketTester:
             print("\n⚠️ ERRORS ENCOUNTERED:")
             for error in self.test_results['errors']:
                 print(f"  - {error}")
+    
+    def interactive_ticker_check(self):
+        """Interactive ticker check for user-specified cryptocurrency"""
+        print("\n" + "=" * 80)
+        print("🔍 INTERACTIVE TICKER CHECK")
+        print("=" * 80)
+        print()
+        
+        # Show available cryptocurrencies
+        print("📊 Available cryptocurrencies (top 10 by market cap):")
+        available_cryptos = [
+            "BTC/USD (Bitcoin)",
+            "ETH/USD (Ethereum)", 
+            "SOL/USD (Solana)",
+            "BNB/USD (Binance Coin)",
+            "XRP/USD (Ripple)",
+            "DOGE/USD (Dogecoin)",
+            "ADA/USD (Cardano)",
+            "TRX/USD (Tron)",
+            "AVAX/USD (Avalanche)",
+            "TON/USD (Toncoin)"
+        ]
+        
+        for i, crypto in enumerate(available_cryptos, 1):
+            print(f"  {i:2d}. {crypto}")
+        
+        print("\nYou can also try other symbols like:")
+        print("     MATIC/USD, DOT/USD, LINK/USD, UNI/USD, etc.")
+        print()
+        
+        # Get user input
+        try:
+            user_input = input("🎯 Enter a cryptocurrency ticker (e.g., BTC/USD) or press Enter to skip: ").strip().upper()
+            
+            if not user_input:
+                print("⏭️ Skipping interactive ticker check.")
+                return
+            
+            # Validate format
+            if "/" not in user_input:
+                user_input = f"{user_input}/USD"
+            
+            print(f"\n🔍 Testing real-time data for {user_input}...")
+            print("=" * 50)
+            
+            # Create new crypto instance for dedicated test
+            from crypto_alpaca import CryptoAlpaca
+            test_crypto = CryptoAlpaca()
+            
+            if test_crypto.connect():
+                print(f"✅ Connected to crypto stream")
+                time.sleep(1)
+                
+                if test_crypto.subscribe([user_input], ["trades", "quotes"]):
+                    print(f"✅ Subscribed to {user_input}")
+                    print(f"🔍 Listening for live data for 15 seconds...")
+                    print()
+                    
+                    start_time = time.time()
+                    data_received = False
+                    
+                    while time.time() - start_time < 15:
+                        if test_crypto.data_count > 0 and not data_received:
+                            data_received = True
+                            print(f"🎉 SUCCESS! Live {user_input} data received!")
+                        
+                        time.sleep(1)
+                    
+                    # Show results
+                    if test_crypto.data_count > 0:
+                        latest_price = test_crypto.get_latest_price(user_input)
+                        if latest_price:
+                            print(f"\n💰 Latest {user_input} price: ${latest_price:,.2f}")
+                        print(f"📊 Total data points received: {test_crypto.data_count}")
+                        print(f"✅ {user_input} is actively trading on Alpaca!")
+                    else:
+                        print(f"\n⚠️ No data received for {user_input}")
+                        print("This could mean:")
+                        print("  • Symbol not available on Alpaca")
+                        print("  • Low trading activity at this time")
+                        print("  • Incorrect symbol format")
+                
+                else:
+                    print(f"❌ Failed to subscribe to {user_input}")
+                    print("Symbol may not be available on Alpaca crypto feed")
+                
+                test_crypto.disconnect()
+                
+            else:
+                print("❌ Failed to connect for ticker check")
+                
+        except KeyboardInterrupt:
+            print("\n⚠️ Ticker check interrupted by user")
+        except Exception as e:
+            print(f"❌ Error during ticker check: {e}")
+        
+        print("\n🏁 Interactive ticker check completed!")
+        print("=" * 80)
 
 
 def main():
