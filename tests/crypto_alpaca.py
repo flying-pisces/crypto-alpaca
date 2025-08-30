@@ -85,10 +85,10 @@ class CryptoAlpaca:
             print("🔌 Connecting to crypto WebSocket...")
             
             # Create WebSocket with authentication headers
-            headers = {
-                'APCA-API-KEY-ID': self.api_key,
-                'APCA-API-SECRET-KEY': self.secret_key
-            }
+            headers = [
+                f'APCA-API-KEY-ID: {self.api_key}',
+                f'APCA-API-SECRET-KEY: {self.secret_key}'
+            ]
             
             self.ws = websocket.WebSocketApp(
                 self.ws_url,
